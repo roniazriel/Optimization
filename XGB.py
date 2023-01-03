@@ -13,12 +13,21 @@ from imblearn.over_sampling import SMOTE, ADASYN, BorderlineSMOTE
 from imblearn.under_sampling import RandomUnderSampler, NearMiss, TomekLinks
 from sklearn.decomposition import PCA
 from collections import Counter
-from optuna.visualization import plot_contour
-from optuna.visualization import plot_intermediate_values
-from optuna.visualization import plot_optimization_history
-from optuna.visualization import plot_parallel_coordinate
-from optuna.visualization import plot_param_importances
-from optuna.visualization import plot_slice
+
+
+def learning_task(data, task):
+    if task == 'Binary':
+        data['class'] = np.where(data['Success_Rates'] > 0, 1, 0)
+        return data
+    elif task == 'Multi':
+        return data
+    elif task == '3 class':
+        col = 'Success_Rates'
+        conditions = [data[col] >= 8, (data[col] < 8) & (data[col] > 3), data[col] <= 3]
+        choices = [2, 1, 0]
+        data["class"] = np.select(conditions, choices, default=np.nan)
+    else:
+        print("Invalid task!")
 
 
 def split_data(X, y, test_size=0.2, val_size=0.25, over_sampling=True, method=1):
@@ -29,9 +38,9 @@ def split_data(X, y, test_size=0.2, val_size=0.25, over_sampling=True, method=1)
     components = pca.fit_transform(X_train)
     label = y_train[['class']]
     label['class_name'] = np.where(y_train['class'] == 0, "Not Reached", "Reached")
-    fig = px.scatter(components, x=0, y=1, color=label['class'],color_continuous_scale=px.colors.qualitative.Dark24)
+    fig = px.scatter(components, x=0, y=1, color=label['class'], color_continuous_scale=px.colors.qualitative.Dark24)
     fig.update_layout(title='PCA -Train Data before resample')
-    fig.write_image("/home/ar1/Desktop/plots/PCA before resample"+str(over_sampling)+str(method)+".png")
+    fig.write_image("/home/ar1/Desktop/plots/PCA before resample" + str(over_sampling) + str(method) + ".png")
 
     if over_sampling:
         if method == 1:
@@ -71,9 +80,9 @@ def split_data(X, y, test_size=0.2, val_size=0.25, over_sampling=True, method=1)
     components = pca.fit_transform(X_res)
     label = y_res[['class']]
     label['class_name'] = np.where(y_res['class'] == 0, "Not Reached", "Reached")
-    fig = px.scatter(components, x=0, y=1, color=label['class'],color_continuous_scale=px.colors.qualitative.Dark24)
+    fig = px.scatter(components, x=0, y=1, color=label['class'], color_continuous_scale=px.colors.qualitative.Dark24)
     fig.update_layout(title='PCA -Dataset after resample')
-    fig.write_image("/home/ar1/Desktop/plots/PCA after resample"+str(over_sampling)+str(method)+".png")
+    fig.write_image("/home/ar1/Desktop/plots/PCA after resample" + str(over_sampling) + str(method) + ".png")
 
     print("X train shape", X_train.shape)
     print("y train shape", y_train.shape)
@@ -85,33 +94,19 @@ def split_data(X, y, test_size=0.2, val_size=0.25, over_sampling=True, method=1)
     return X_train, X_val, X_test, y_train, y_val, y_test
 
 
-def plot_class_hist(y_train, y_val, y_test,over_sampling=True, method=1):
-    a = np.unique(np.squeeze(y_test), return_counts=True)
-    sns.countplot(x=y_test["class"])
-    for v in [0, 1]:
-        plt.text(v, a[1][v], str(a[1][v]))
-    plt.title('y test')
-    plt.xlabel('class')
-    plt.ylabel('count')
-    plt.savefig('/home/ar1/Desktop/plots/y test' + str(over_sampling) + str(method) + ".png")
+def plot_class_hist(y_train, y_val, y_test, over_sampling=True, method=1):
+    temp_train = y_train[['class']]
+    temp_test = y_test[['class']]
+    temp_val = y_val[['class']]
 
-    b = np.unique(np.squeeze(y_train), return_counts=True)
-    sns.countplot(x=y_train["class"])
-    for v in [0, 1]:
-        plt.text(v, b[1][v], str(b[1][v]))
-    plt.title('y train')
-    plt.xlabel('class')
-    plt.ylabel('count')
-    plt.savefig('/home/ar1/Desktop/plots/y train' + str(over_sampling) + str(method) + ".png")
-
-    c = np.unique(np.squeeze(y_val), return_counts=True)
-    sns.countplot(x=y_val["class"])
-    for v in [0, 1]:
-        plt.text(v, c[1][v], str(c[1][v]))
-    plt.title('y valid')
-    plt.xlabel('class')
-    plt.ylabel('count')
-    plt.savefig('/home/ar1/Desktop/plots/y valid' + str(over_sampling) + str(method) + ".png")
+    temp_train["Dataset"] = "Train"
+    temp_test["Dataset"] = "Validation"
+    temp_val["Dataset"] = "Test"
+    visualization = pd.concat([temp_train, temp_test, temp_val], ignore_index=True)
+    sns.set()
+    ax = sns.countplot(data=visualization, x='Dataset', hue='class', palette='mako')
+    plt.title("Class Distribution")
+    plt.savefig('/home/ar1/Desktop/plots/Class Distribution' + str(over_sampling) + str(method) + ".png")
 
 
 class XGB:
@@ -180,9 +175,10 @@ class XGB:
 
         # plot best trial
         optuna.visualization.matplotlib.plot_optimization_history(study)
-        plt.savefig('/home/ar1/Desktop/plots/optimization_history' + str(self.over_sampling) + str(self.method) + ".png")
-        # optuna.visualization.matplotlib.plot_intermediate_values(study)
-        # plt.savefig('/home/ar1/Desktop/plots/intermediate_values' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.savefig(
+            '/home/ar1/Desktop/plots/optimization_history' + str(self.over_sampling) + str(self.method) + ".png")
+        # optuna.visualization.matplotlib.plot_intermediate_values(study) plt.savefig(
+        # '/home/ar1/Desktop/plots/intermediate_values' + str(self.over_sampling) + str(self.method) + ".png")
         optuna.visualization.matplotlib.plot_parallel_coordinate(study)
         plt.savefig('/home/ar1/Desktop/plots/parallel_coordinate' + str(self.over_sampling) + str(self.method) + ".png")
         optuna.visualization.matplotlib.plot_contour(study)
@@ -207,12 +203,14 @@ class XGB:
         epochs = len(results['validation_0']['auc'])
         x_axis = range(0, epochs)
         # fig, ax = plt.subplots()
+        plt.clf()
         plt.plot(x_axis, results['validation_0']['auc'], label='Train')
         plt.plot(x_axis, results['validation_1']['auc'], label='Validation')
         plt.legend()
         plt.ylabel('AUC')
         plt.title('XGBoost AUC')
         plt.savefig('/home/ar1/Desktop/plots/fit AUC' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.clf()
 
         # plot error #(wrong cases)/#(all cases)
         epochs = len(results['validation_0']['error'])
@@ -224,36 +222,42 @@ class XGB:
         plt.ylabel('Error #(wrong cases)/#(all cases)')
         plt.title('XGBoost Error')
         plt.savefig('/home/ar1/Desktop/plots/fit error' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.clf()
 
         '''Predict Results'''
         preds = estimator.predict(self.X_test)
         print('Classification Report: ')
         print(classification_report(self.y_test, preds))
         report_dict = classification_report(self.y_test, preds, output_dict=True)
-        pd.DataFrame(report_dict).to_csv('/home/ar1/Desktop/plots/classification_report.csv')
+        pd.DataFrame(report_dict).to_csv('/home/ar1/Desktop/plots/classification_report' + str(self.over_sampling) +
+                                         str(self.method) + ".csv")
         print('Test AUC Score: ')
         print(roc_auc_score(self.y_test, preds))
         cm = confusion_matrix(self.y_test, preds)
         cm_normalized = cm.astype('float') / cm.sum(axis=1)[:, np.newaxis]
         sns.heatmap(cm_normalized, annot=True, fmt='.0%')
         plt.title('Confusion Matrix')
-        plt.ylabel('Actal Values')
+        plt.ylabel('Actual Values')
         plt.xlabel('Predicted Values')
-        plt.savefig('/home/ar1/Desktop/plots/fit Confusion Matrix' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.savefig(
+            '/home/ar1/Desktop/plots/fit Confusion Matrix' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.clf()
 
         errors = np.squeeze(self.y_test) - preds
-        error_df = pd.DataFrame(errors, columns=["error"])
-        amount = [error_df['error'].loc[error_df['error'] == -1].count(),
-                  error_df['error'].loc[error_df['error'] == 0].count(),
-                  error_df['error'].loc[error_df['error'] == 1].count()]
-        data = {'clusters error': [*range(-1, 2, 1)], 'amount': amount}
-        df = pd.DataFrame(data)
-
-        plt.bar(x=df['clusters error'], height=df['amount'])
-        plt.title('errors - True-Predictions')
-        plt.xlabel('errors [Clusters]')
-        plt.ylabel('count')
-        plt.savefig('/home/ar1/Desktop/plots/errors bar' + str(self.over_sampling) + str(self.method) + ".png")
+        # print(errors)
+        # error_df = pd.DataFrame(errors, columns=["error"])
+        # amount = [error_df['error'].loc[error_df['error'] == -1].count(),
+        #           error_df['error'].loc[error_df['error'] == 0].count(),
+        #           error_df['error'].loc[error_df['error'] == 1].count()]
+        # data = {'clusters error': [*range(-1, 2, 1)], 'amount': amount}
+        # df = pd.DataFrame(data)
+        #
+        # plt.bar(x=df['clusters error'], height=df['amount'])
+        # plt.title('errors - True-Predictions')
+        # plt.xlabel('errors [Clusters]')
+        # plt.ylabel('count')
+        # plt.savefig('/home/ar1/Desktop/plots/errors bar' + str(self.over_sampling) + str(self.method) + ".png")
+        plt.clf()
 
         # xgb.plot_tree(estimator)
         # plt.show()
@@ -262,12 +266,12 @@ class XGB:
 
 
 if __name__ == '__main__':
-    data = pd.read_csv('6dof_disc_and_classification.csv')
-    data.drop('Unnamed: 0', inplace=True, axis=1)
-    data['class'] = np.where(data['Success_Rates'] > 0, 1, 0)
-    methods = [1, 2, 3]
-    over_sampling = [True, False]
-
+    df = pd.read_csv('6dof_disc_and_classification.csv')
+    df.drop('Unnamed: 0', inplace=True, axis=1)
+    data = learning_task(data=df, task='3 class')
+    # methods = [1, 2, 3]
+    # over_sampling = [True, False]
+    #
     # for v in over_sampling:
     #     for i in methods:
     #         print('  Oversampling?: {}'.format(v))
@@ -278,5 +282,5 @@ if __name__ == '__main__':
     #         xg.plot_performance(best_params)
 
     xg = XGB(dataset=data, over_sampling=False, method=1)
-    best_params = xg.hyper_parameter_tuning()
-    xg.plot_performance(best_params)
+    # best_params = xg.hyper_parameter_tuning()
+    # xg.plot_performance(best_params)
